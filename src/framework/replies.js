@@ -1,4 +1,3 @@
-// src/framework/replies.js
 function canReply(interaction) {
   return interaction && typeof interaction.reply === 'function';
 }

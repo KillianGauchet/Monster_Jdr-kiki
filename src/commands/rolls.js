@@ -1,4 +1,3 @@
-// src/commands/rolls.js
 const { SlashCommandBuilder } = require('discord.js');
 const { readDB, writeDB, ensureUser } = require('../framework/ficheStore');
 const { d, xdy, adv, parseXdy } = require('../framework/random');
