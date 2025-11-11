@@ -1,4 +1,3 @@
-// src/framework/random.js
 function d(max) {
   const m = Number(max) || 0;
   if (m <= 0) return 0;

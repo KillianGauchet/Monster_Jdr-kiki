@@ -1,4 +1,3 @@
-// src/framework/economie.js
 const { promises: fs } = require('node:fs');
 const path = require('node:path');
 const { ok, fail } = require('./replies');
