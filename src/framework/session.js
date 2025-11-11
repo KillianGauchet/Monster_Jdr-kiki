@@ -2,14 +2,12 @@ const { promises: fs } = require('node:fs');
 const path = require('node:path');
 
 const dbRoot = path.join(__dirname, '../../db');
-const sessionIdPath = path.join(dbRoot, 'session_id.json');
+const sessionMapFile = path.join(dbRoot, 'session_id.json');
+const ficheFile = path.join(dbRoot, 'fiche.json');
+const especeFile = path.join(dbRoot, 'espece.json');
+const banqueFile = path.join(dbRoot, 'banque.json');
 
 async function ensureDir(p) { await fs.mkdir(p, { recursive: true }); }
-
-async function ensureDbRoot() {
-  try { await fs.access(dbRoot); }
-  catch { await ensureDir(dbRoot); }
-}
 
 async function readJson(file, fallback) {
   try {
@@ -25,65 +23,103 @@ async function writeJson(file, data) {
   await fs.writeFile(file, JSON.stringify(data, null, 2), 'utf8');
 }
 
+/* Mapping user->session courante */
 async function loadSessionMap() {
-  await ensureDbRoot();
-  const data = await readJson(sessionIdPath, { users: {} });
-  if (!data.users) data.users = {};
-  return data;
+  await ensureDir(dbRoot);
+  const db = await readJson(sessionMapFile, { users: {} });
+  if (!db.users) db.users = {};
+  return db;
 }
-async function saveSessionMap(db) { await writeJson(sessionIdPath, db); }
+async function saveSessionMap(db) { await writeJson(sessionMapFile, db); }
 
 async function getSession(userId) {
   const db = await loadSessionMap();
   return db.users[userId] || '1';
 }
 
-async function setSession(userId, session) {
-  const db = await loadSessionMap();
-  db.users[userId] = String(session);
-  await saveSessionMap(db);
-  await ensureSessionFiles(String(session));
+/* Fichiers de bases */
+function pathFiche()  { return ficheFile; }
+function pathEspece() { return especeFile; }
+function pathBanque() { return banqueFile; }
+
+/* Helpers internes pour bases */
+async function ensureBase(file) {
+  await ensureDir(path.dirname(file));
+  const base = await readJson(file, { sessions: {} });
+  if (!base.sessions) base.sessions = {};
+  return base;
+}
+async function saveBase(file, base) { await writeJson(file, base); }
+
+/* Existence / création / suppression de session au niveau des 3 bases */
+async function sessionExists(sessionId) {
+  const [F, E, B] = await Promise.all([ensureBase(ficheFile), ensureBase(especeFile), ensureBase(banqueFile)]);
+  return Boolean(F.sessions[sessionId] || E.sessions[sessionId] || B.sessions[sessionId]);
 }
 
-async function ensureSessionFiles(session) {
-  const folder = path.join(dbRoot, String(session));
-  await ensureDir(folder);
-  for (const name of ['fiche.json', 'espece.json', 'banque.json']) {
-    const file = path.join(folder, name);
-    try { await fs.access(file); }
-    catch { await writeJson(file, { users: {} }); }
+async function createSession(sessionId) {
+  const [F, E, B] = await Promise.all([ensureBase(ficheFile), ensureBase(especeFile), ensureBase(banqueFile)]);
+  if (!F.sessions[sessionId]) F.sessions[sessionId] = { users: {} };
+  if (!E.sessions[sessionId]) E.sessions[sessionId] = { users: {} };
+  if (!B.sessions[sessionId]) B.sessions[sessionId] = { users: {} };
+  await Promise.all([saveBase(ficheFile, F), saveBase(especeFile, E), saveBase(banqueFile, B)]);
+}
+
+async function deleteSession(sessionId) {
+  const [F, E, B] = await Promise.all([ensureBase(ficheFile), ensureBase(especeFile), ensureBase(banqueFile)]);
+  if (F.sessions[sessionId]) delete F.sessions[sessionId];
+  if (E.sessions[sessionId]) delete E.sessions[sessionId];
+  if (B.sessions[sessionId]) delete B.sessions[sessionId];
+  await Promise.all([saveBase(ficheFile, F), saveBase(especeFile, E), saveBase(banqueFile, B)]);
+
+  // Nettoyer tous les users mappés sur cette session
+  const map = await loadSessionMap();
+  for (const [uid, sid] of Object.entries(map.users)) {
+    if (sid === String(sessionId)) delete map.users[uid];
   }
+  await saveSessionMap(map);
 }
 
-async function pathFiche(userId) {
-  const s = await getSession(userId);
-  await ensureSessionFiles(s);
-  return path.join(dbRoot, String(s), 'fiche.json');
-}
-async function pathEspece(userId) {
-  const s = await getSession(userId);
-  await ensureSessionFiles(s);
-  return path.join(dbRoot, String(s), 'espece.json');
-}
-async function pathBanque(userId) {
-  const s = await getSession(userId);
-  await ensureSessionFiles(s);
-  return path.join(dbRoot, String(s), 'banque.json');
+/* Accès lecture/écriture users pour une session donnée dans une base */
+async function readSessionUsers(file, sessionId) {
+  const base = await ensureBase(file);
+  if (!base.sessions[sessionId]) base.sessions[sessionId] = { users: {} };
+  if (!base.sessions[sessionId].users) base.sessions[sessionId].users = {};
+  return base.sessions[sessionId].users;
 }
 
-/* Installation de global.PATHS avec garde idempotente */
+async function writeSessionUsers(file, sessionId, usersObj) {
+  const base = await ensureBase(file);
+  base.sessions[sessionId] = base.sessions[sessionId] || { users: {} };
+  base.sessions[sessionId].users = usersObj;
+  await saveBase(file, base);
+}
+
+/* setSession: n’accepte que des sessions existantes */
+async function setSession(userId, session) {
+  const sid = String(session);
+  const exists = await sessionExists(sid);
+  if (!exists) throw new Error('Session inconnue');
+  const db = await loadSessionMap();
+  db.users[userId] = sid;
+  await saveSessionMap(db);
+}
+
+/* Installer global.PATHS (compat) */
 let installed = false;
 async function installGlobalPaths() {
   if (installed && global.PATHS) return;
   global.PATHS = {
-    fiche: (userId) => pathFiche(userId),
-    espece: (userId) => pathEspece(userId),
-    banque: (userId) => pathBanque(userId),
+    fiche:  () => pathFiche(),
+    espece: () => pathEspece(),
+    banque: () => pathBanque(),
   };
   installed = true;
 }
 
 module.exports = {
-  getSession, setSession, ensureSessionFiles, installGlobalPaths,
+  getSession, setSession, installGlobalPaths,
   pathFiche, pathEspece, pathBanque,
+  readSessionUsers, writeSessionUsers,
+  sessionExists, createSession, deleteSession,
 };

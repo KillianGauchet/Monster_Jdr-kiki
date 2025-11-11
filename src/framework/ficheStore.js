@@ -1,35 +1,29 @@
 const { promises: fs } = require('node:fs');
 const path = require('node:path');
-
-const getFile = async (userId) => await global.PATHS.fiche(userId); // ⟵ attend le chemin
+const { getSession, pathFiche, readSessionUsers, writeSessionUsers } = require('./session');
 
 async function ensureFile(file) {
   try { await fs.access(file); }
   catch {
     await fs.mkdir(path.dirname(file), { recursive: true });
-    await fs.writeFile(file, JSON.stringify({ users: {} }, null, 2), 'utf8');
+    await fs.writeFile(file, JSON.stringify({ sessions: {} }, null, 2), 'utf8');
   }
 }
 
 async function readDB(userId) {
-  const file = await getFile(userId);                        // ⟵ await
+  const file = pathFiche();
   await ensureFile(file);
-  let raw = await fs.readFile(file, 'utf8');
-  if (!raw.trim()) {
-    await fs.writeFile(file, JSON.stringify({ users: {} }, null, 2), 'utf8');
-    return { users: {} };
-  }
-  try { return JSON.parse(raw); }
-  catch {
-    await fs.writeFile(file, JSON.stringify({ users: {} }, null, 2), 'utf8');
-    return { users: {} };
-  }
+  const sessionId = await getSession(userId);
+  const users = await readSessionUsers(file, sessionId);
+  // Retour compat: { users: { ... } }
+  return { users: { ...users } };
 }
 
 async function writeDB(userId, db) {
-  const file = await getFile(userId);                        // ⟵ await
+  const file = pathFiche();
   await ensureFile(file);
-  await fs.writeFile(file, JSON.stringify(db, null, 2), 'utf8');
+  const sessionId = await getSession(userId);
+  await writeSessionUsers(file, sessionId, db.users || {});
 }
 
 function ensureUser(db, userId) {
