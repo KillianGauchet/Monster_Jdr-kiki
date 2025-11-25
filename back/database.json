@@ -1,0 +1,126 @@
+{
+  "personnages": [
+    {
+      "id": 1,
+      "nom": "Arkos le Guerrier",
+      "classe": "Guerrier",
+      "niveau": 5,
+      "pv": 42,
+      "pv_max": 42,
+      "attaque": 8,
+      "defense": 6,
+      "inventaire": [1, 2],
+      "quetes": [1],
+      "lieu": 1
+    },
+    {
+      "id": 2,
+      "nom": "Lyra la Mage",
+      "classe": "Mage",
+      "niveau": 4,
+      "pv": 28,
+      "pv_max": 28,
+      "attaque": 12,
+      "defense": 2,
+      "inventaire": [3],
+      "quetes": [],
+      "lieu": 2
+    }
+  ],
+
+  "monstres": [
+    {
+      "id": 1,
+      "nom": "Gobelin",
+      "pv": 10,
+      "attaque": 3,
+      "defense": 1,
+      "recompense_xp": 5,
+      "recompense_objet": 4
+    },
+    {
+      "id": 2,
+      "nom": "Dragon Rouge",
+      "pv": 200,
+      "attaque": 25,
+      "defense": 15,
+      "recompense_xp": 200,
+      "recompense_objet": 5
+    }
+  ],
+
+  "objets": [
+    {
+      "id": 1,
+      "nom": "Épée courte",
+      "type": "arme",
+      "bonus_attaque": 3
+    },
+    {
+      "id": 2,
+      "nom": "Bouclier en bois",
+      "type": "bouclier",
+      "bonus_defense": 2
+    },
+    {
+      "id": 3,
+      "nom": "Grimoire de flammes",
+      "type": "magie",
+      "bonus_attaque": 5
+    },
+    {
+      "id": 4,
+      "nom": "Potion de soin",
+      "type": "potion",
+      "soin": 15
+    },
+    {
+      "id": 5,
+      "nom": "Gemme draconique",
+      "type": "artefact",
+      "description": "Un cristal mystérieux rempli d'énergie."
+    }
+  ],
+
+  "quetes": [
+    {
+      "id": 1,
+      "titre": "La menace gobeline",
+      "description": "Éliminer les gobelins qui pillent les routes du village.",
+      "statut": "en cours",
+      "objectif": {
+        "type": "tuer",
+        "cible": 1,
+        "quantite": 3
+      }
+    },
+    {
+      "id": 2,
+      "titre": "L’ombre du dragon",
+      "description": "Trouver et vaincre le Dragon Rouge.",
+      "statut": "non commencée",
+      "objectif": {
+        "type": "boss",
+        "cible": 2
+      }
+    }
+  ],
+
+  "lieux": [
+    {
+      "id": 1,
+      "nom": "Village d'Eldenwood",
+      "description": "Un petit village paisible entouré de forêts."
+    },
+    {
+      "id": 2,
+      "nom": "Tour du Mage",
+      "description": "Une vieille tour remplie de magie ancienne."
+    },
+    {
+      "id": 3,
+      "nom": "Montagne du Dragon",
+      "description": "Le repaire légendaire du Dragon Rouge."
+    }
+  ]
+}
