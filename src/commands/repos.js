@@ -22,49 +22,70 @@ async function getPlayerData(userId) {
 }
 
 const builders = [
-  new SlashCommandBuilder().setName('repos_long').setDescription('Restaure HP, Mana et Stamina au maximum.'),
-  new SlashCommandBuilder().setName('repos_court').setDescription('Restaure Mana et Stamina au maximum.'),
   new SlashCommandBuilder()
-    .setName('repos_simple')
-    .setDescription('Restaure une ressource (mana ou stam).')
+    .setName('repos')
+    .setDescription('Restaure des ressources (HP, Mana, Stamina)')
+    .addStringOption(o => 
+      o.setName('type')
+        .setDescription('Type de repos')
+        .setRequired(true)
+        .addChoices(
+          { name: 'Long (HP + Mana + Stam)', value: 'long' },
+          { name: 'Court (Mana + Stam)', value: 'court' },
+          { name: 'Simple (Mana ou Stam)', value: 'simple' }
+        ))
     .addStringOption(o =>
       o.setName('cible')
-        .setDescription('mana ou stam')
-        .setRequired(true)
-        .addChoices({ name: 'mana', value: 'mana' }, { name: 'stam', value: 'stam' })),
+        .setDescription('Ressource à restaurer (pour repos simple uniquement)')
+        .setRequired(false)
+        .addChoices(
+          { name: 'Mana', value: 'mana' },
+          { name: 'Stamina', value: 'stam' }
+        )),
 ];
 
 const handlers = {
-  repos_long: async (interaction) => {
+  repos: async (interaction) => {
     const userId = interaction.user.id;
-    const { db, player } = await getPlayerData(userId);
-    const j = player.joueur;
-    j.hp = j.hpMax;
-    j.mana = j.manaMax;
-    j.stam = j.stamMax;
-    await writeDB(db);
-    return ok(interaction, 'Repos long : tout restauré.');
-  },
-
-  repos_court: async (interaction) => {
-    const userId = interaction.user.id;
-    const { db, player } = await getPlayerData(userId);
-    const j = player.joueur;
-    j.mana = j.manaMax;
-    j.stam = j.stamMax;
-    await writeDB(db);
-    return ok(interaction, 'Repos court : mana/stam restaurés.');
-  },
-
-  repos_simple: async (interaction) => {
-    const userId = interaction.user.id;
+    const type = interaction.options.getString('type');
     const cible = interaction.options.getString('cible');
     const { db, player } = await getPlayerData(userId);
     const j = player.joueur;
-    if (cible === 'mana') j.mana = j.manaMax;
-    else j.stam = j.stamMax;
-    await writeDB(db);
-    return ok(interaction, `Repos simple : ${cible} restauré.`);
+
+    if (type === 'long') {
+      j.hp = j.hpMax;
+      j.mana = j.manaMax;
+      j.stam = j.stamMax;
+      await writeDB(db);
+      return ok(interaction, '✨ **Repos long** : HP, Mana et Stamina restaurés au maximum.');
+    }
+
+    if (type === 'court') {
+      j.mana = j.manaMax;
+      j.stam = j.stamMax;
+      await writeDB(db);
+      return ok(interaction, '💫 **Repos court** : Mana et Stamina restaurés au maximum.');
+    }
+
+    if (type === 'simple') {
+      if (!cible) {
+        return ok(interaction, '⚠️ Pour un repos simple, spécifie la ressource à restaurer (cible: mana ou stam).');
+      }
+
+      if (cible === 'mana') {
+        j.mana = j.manaMax;
+        await writeDB(db);
+        return ok(interaction, '💧 **Repos simple** : Mana restaurée au maximum.');
+      }
+      
+      if (cible === 'stam') {
+        j.stam = j.stamMax;
+        await writeDB(db);
+        return ok(interaction, '⚡ **Repos simple** : Stamina restaurée au maximum.');
+      }
+    }
+
+    return ok(interaction, '❌ Type de repos invalide.');
   },
 };
 
