@@ -1,5 +1,5 @@
 const { SlashCommandBuilder, EmbedBuilder } = require('discord.js');
-const { readDB, writeDB, ensureUser, updateDerived } = require('../framework/ficheStore');
+const { readPlayerDB, writePlayerDB, ensureUser, updateDerived } = require('../framework/ficheStore');
 const { ok } = require('../framework/replies');
 
 function clampAdd(current, add, max) { return Math.min(current + add, max); }
@@ -55,74 +55,61 @@ const builders = [
 const handlers = {
   init: async (interaction) => {
     const userId = interaction.user.id;
-    const db = await readDB(userId);
-    const u = ensureUser(db, userId);
-
+    const { db, player } = await readPlayerDB(userId);
+    const u = player.joueur;
     u.force = interaction.options.getInteger('force');
     u.constitution = interaction.options.getInteger('constitution');
     u.agilite = interaction.options.getInteger('agilite');
     u.intelligence = interaction.options.getInteger('intelligence');
     u.perception = interaction.options.getInteger('perception');
-
     updateDerived(u);
     u.hp = u.hpMax; u.mana = u.manaMax; u.stam = u.stamMax;
-
-    await writeDB(userId, db);
+    await writePlayerDB(db);
     return ok(interaction, 'Stats initialisées.');
   },
 
   modif: async (interaction) => {
     const userId = interaction.user.id;
-    const db = await readDB(userId);
-    const u = ensureUser(db, userId);
-
+    const { db, player } = await readPlayerDB(userId);
+    const u = player.joueur;
     const attr = interaction.options.getString('attribut');
     const val = interaction.options.getInteger('valeur');
-
     u[attr] = (u[attr] || 0) + val;
     if (['force', 'constitution', 'agilite', 'intelligence'].includes(attr)) updateDerived(u);
-
-    await writeDB(userId, db);
+    await writePlayerDB(db);
     return ok(interaction, `${attr} modifiée de ${val}.`);
   },
 
   add: async (interaction) => {
     const userId = interaction.user.id;
-    const db = await readDB(userId);
-    const u = ensureUser(db, userId);
-
+    const { db, player } = await readPlayerDB(userId);
+    const u = player.joueur;
     const cible = interaction.options.getString('cible');
     const val = interaction.options.getInteger('valeur');
-
     if (cible === 'hp') u.hp = clampAdd(u.hp, val, u.hpMax);
     if (cible === 'stam') u.stam = clampAdd(u.stam, val, u.stamMax);
     if (cible === 'mana') u.mana = clampAdd(u.mana, val, u.manaMax);
-
-    await writeDB(userId, db);
+    await writePlayerDB(db);
     return ok(interaction, `Ajouté ${val} à ${cible}.`);
   },
 
   cout: async (interaction) => {
     const userId = interaction.user.id;
-    const db = await readDB(userId);
-    const u = ensureUser(db, userId);
-
+    const { db, player } = await readPlayerDB(userId);
+    const u = player.joueur;
     const cible = interaction.options.getString('cible');
     const val = interaction.options.getInteger('valeur');
-
     if (cible === 'hp') u.hp = clampSub(u.hp, val);
     if (cible === 'stam') u.stam = clampSub(u.stam, val);
     if (cible === 'mana') u.mana = clampSub(u.mana, val);
-
-    await writeDB(userId, db);
+    await writePlayerDB(db);
     return ok(interaction, `Retiré ${val} à ${cible}.`);
   },
 
   stats: async (interaction) => {
     const userId = interaction.user.id;
-    const db = await readDB(userId);
-    const u = ensureUser(db, userId);
-
+    const { player } = await readPlayerDB(userId);
+    const u = player.joueur;
     const embed = new EmbedBuilder()
       .setTitle('Fiche joueur')
       .addFields(
@@ -136,7 +123,6 @@ const handlers = {
         { name: 'Perception', value: `${u.perception}`, inline: true },
       )
       .setColor(0x00AE86);
-
     return ok(interaction, '', { embeds: [embed] });
   },
 };

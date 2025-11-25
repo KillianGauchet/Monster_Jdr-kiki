@@ -1,9 +1,38 @@
 const { SlashCommandBuilder } = require('discord.js');
-const { readDB, writeDB, ensureUser } = require('../framework/ficheStore');
+const { readDB, writeDB } = require('../framework/session');
 const { d, xdy, adv, parseXdy } = require('../framework/random');
 const { ok, fail } = require('../framework/replies');
 
-/* --- Builders --- */
+async function getPlayerData(userId) {
+  const db = await readDB();
+  const sessionId = db.userSessions?.[userId] || '1';
+  if (!db.sessions[sessionId]) db.sessions[sessionId] = { players: {} };
+  if (!db.sessions[sessionId].players[userId]) {
+    db.sessions[sessionId].players[userId] = {
+      joueur: {
+        force: 0, constitution: 0, agilite: 0, intelligence: 0, perception: 0,
+        hp: 0, hpMax: 0, mana: 0, manaMax: 0, stam: 0, stamMax: 0,
+      },
+      money: { bank: { pc: 0, pa: 0, po: 0, pp: 0 }, wallet: { pc: 0, pa: 0, po: 0, pp: 0 } },
+    };
+  }
+  return { db, sessionId, player: db.sessions[sessionId].players[userId] };
+}
+
+function formatRoll(title, stat, roll, type, mod, final) {
+  const modStr = `${mod >= 0 ? '+' : ''}${mod}`;
+  return `**${title}** (${stat})\n🎲 [${roll.list.join(', ')}]${type ? ` (${type})` : ''} → ${roll.chosen}\nModif: ${modStr}\nRésultat: ${final}`;
+}
+
+function getEffets(interaction) {
+  const effets = [];
+  for (let i = 1; i <= 9; i++) {
+    const v = interaction.options.getInteger('effet' + i);
+    if (v) effets.push({ index: i, valeur: v });
+  }
+  return effets;
+}
+
 const builders = [
   new SlashCommandBuilder()
     .setName('roll')
@@ -65,28 +94,11 @@ const builders = [
     .addIntegerOption(o => o.setName('effet9').setDescription('Effet 9').setRequired(false)),
 ];
 
-/* --- Helpers métier --- */
-function formatRoll(title, stat, roll, type, mod, final) {
-  const modStr = `${mod >= 0 ? '+' : ''}${mod}`;
-  return `**${title}** (${stat})\n🎲 [${roll.list.join(', ')}]${type ? ` (${type})` : ''} → ${roll.chosen}\nModif: ${modStr}\nRésultat: ${final}`;
-}
-
-function getEffets(interaction) {
-  const effets = [];
-  for (let i = 1; i <= 9; i++) {
-    const v = interaction.options.getInteger('effet' + i);
-    if (v) effets.push({ index: i, valeur: v });
-  }
-  return effets;
-}
-
-/* --- Handlers --- */
 const handlers = {
   roll: async (interaction) => {
     const min = interaction.options.getInteger('min');
     const max = interaction.options.getInteger('max');
     const de = interaction.options.getString('de');
-
     let out;
     const parsed = parseXdy(de);
     if (parsed) {
@@ -97,7 +109,6 @@ const handlers = {
     } else if (min !== null || max !== null) {
       let a = min ?? 1; let b = max ?? 100;
       if (a > b) [a, b] = [b, a];
-      // utilise d() pour uniformiser
       out = `Roll ${a}-${b}: ${a + (d(b - a + 1) - 1)}`;
     } else {
       out = `Roll 1-100: ${d(100)}`;
@@ -107,95 +118,86 @@ const handlers = {
 
   roll_force: async (interaction) => {
     const userId = interaction.user.id;
-    const db = await readDB(userId); const u = ensureUser(db, userId);
+    const { db, player } = await getPlayerData(userId);
+    const j = player.joueur;
     const type = interaction.options.getString('type') || null;
     const mod = interaction.options.getInteger('modificateur') || 0;
-
-    const roll = adv(u.force, type);
+    const roll = adv(j.force, type);
     const final = roll.chosen + mod;
-    u.stam = Math.max(0, u.stam - roll.chosen);
-    await writeDB(userId, db);
-
-    return ok(interaction, `${formatRoll('Force', u.force, roll, type, mod, final)}\nStam consommée: ${roll.chosen} → Stam: ${u.stam}`);
+    j.stam = Math.max(0, j.stam - roll.chosen);
+    await writeDB(db);
+    return ok(interaction, `${formatRoll('Force', j.force, roll, type, mod, final)}\nStam consommée: ${roll.chosen} → Stam: ${j.stam}`);
   },
 
   roll_agilite: async (interaction) => {
     const userId = interaction.user.id;
-    const db = await readDB(userId); const u = ensureUser(db, userId);
+    const { db, player } = await getPlayerData(userId);
+    const j = player.joueur;
     const type = interaction.options.getString('type') || null;
     const mod = interaction.options.getInteger('modificateur') || 0;
-
-    const roll = adv(u.agilite, type);
+    const roll = adv(j.agilite, type);
     const final = roll.chosen + mod;
-    u.stam = Math.max(0, u.stam - roll.chosen);
-    await writeDB(userId, db);
-
-    return ok(interaction, `${formatRoll('Agilité', u.agilite, roll, type, mod, final)}\nStam consommée: ${roll.chosen} → Stam: ${u.stam}`);
+    j.stam = Math.max(0, j.stam - roll.chosen);
+    await writeDB(db);
+    return ok(interaction, `${formatRoll('Agilité', j.agilite, roll, type, mod, final)}\nStam consommée: ${roll.chosen} → Stam: ${j.stam}`);
   },
 
   roll_constitution: async (interaction) => {
     const userId = interaction.user.id;
-    const db = await readDB(userId); const u = ensureUser(db, userId);
+    const { db, player } = await getPlayerData(userId);
+    const j = player.joueur;
     const type = interaction.options.getString('type') || null;
     const mod = interaction.options.getInteger('modificateur') || 0;
-
-    const roll = adv(u.constitution, type);
+    const roll = adv(j.constitution, type);
     const final = roll.chosen + mod;
-    await writeDB(userId, db);
-
-    return ok(interaction, formatRoll('Constitution', u.constitution, roll, type, mod, final));
+    await writeDB(db);
+    return ok(interaction, formatRoll('Constitution', j.constitution, roll, type, mod, final));
   },
 
   roll_intelligence: async (interaction) => {
     const userId = interaction.user.id;
-    const db = await readDB(userId); const u = ensureUser(db, userId);
+    const { db, player } = await getPlayerData(userId);
+    const j = player.joueur;
     const type = interaction.options.getString('type') || null;
     const mod = interaction.options.getInteger('modificateur') || 0;
-
-    const roll = adv(u.intelligence, type);
+    const roll = adv(j.intelligence, type);
     const final = roll.chosen + mod;
-    await writeDB(userId, db);
-
-    return ok(interaction, formatRoll('Intelligence', u.intelligence, roll, type, mod, final));
+    await writeDB(db);
+    return ok(interaction, formatRoll('Intelligence', j.intelligence, roll, type, mod, final));
   },
 
   roll_perception: async (interaction) => {
     const userId = interaction.user.id;
-    const db = await readDB(userId); const u = ensureUser(db, userId);
+    const { db, player } = await getPlayerData(userId);
+    const j = player.joueur;
     const type = interaction.options.getString('type') || null;
     const mod = interaction.options.getInteger('modificateur') || 0;
-
-    const roll = adv(u.perception, type);
+    const roll = adv(j.perception, type);
     const final = roll.chosen + mod;
-    await writeDB(userId, db);
-
-    return ok(interaction, formatRoll('Perception', u.perception, roll, type, mod, final));
+    await writeDB(db);
+    return ok(interaction, formatRoll('Perception', j.perception, roll, type, mod, final));
   },
 
   roll_sort: async (interaction) => {
     const userId = interaction.user.id;
-    const db = await readDB(userId); const u = ensureUser(db, userId);
-
+    const { db, player } = await getPlayerData(userId);
+    const j = player.joueur;
     const type = interaction.options.getString('type') || null;
     const modInt = interaction.options.getInteger('modificateur_int') || 0;
     const modEffet = interaction.options.getInteger('modificateur_effet') || 0;
     const effets = getEffets(interaction);
-
     const totalEffet = effets.reduce((s, e) => s + e.valeur, 0);
-    const intelDispo = u.intelligence - totalEffet;
+    const intelDispo = j.intelligence - totalEffet;
     if (intelDispo < 0) return fail(interaction, "Erreur : trop d'effets (total > stat intelligence)");
-
     const rollBase = adv(intelDispo, type);
     const intFinal = rollBase.chosen + modInt;
-    u.mana = Math.max(0, u.mana - rollBase.chosen);
-
+    j.mana = Math.max(0, j.mana - rollBase.chosen);
     const out = [
-      `**Roll Sort** (${intelDispo}/${u.intelligence})`,
+      `**Roll Sort** (${intelDispo}/${j.intelligence})`,
       `🎲 [${rollBase.list.join(', ')}]${type ? ` (${type})` : ''} → ${rollBase.chosen}`,
       `Modif int: ${modInt >= 0 ? '+' : ''}${modInt}`,
       `Résultat sort: ${intFinal}`,
     ];
-
     const effetsResults = [];
     for (const e of effets) {
       const r = adv(e.valeur, type);
@@ -206,10 +208,8 @@ const handlers = {
       out.push(`Modificateur effet: ${modEffet >= 0 ? '+' : ''}${modEffet}`);
       out.push(`Effets finaux: [${effetsResults.join(', ')}]`);
     }
-
-    out.push(`Mana consommée: ${rollBase.chosen} → Mana: ${u.mana}`);
-
-    await writeDB(userId, db);
+    out.push(`Mana consommée: ${rollBase.chosen} → Mana: ${j.mana}`);
+    await writeDB(db);
     return ok(interaction, out.join('\n'));
   },
 };

@@ -10,23 +10,22 @@ const builders = [
     .setDescription('Gérer/consulter la session: get | set | close')
     .addStringOption(o =>
       o.setName('action')
-       .setDescription('get, set, close')
-       .setRequired(true)
-       .addChoices(
+        .setDescription('get, set, close')
+        .setRequired(true)
+        .addChoices(
           { name: 'get', value: 'get' },
           { name: 'set', value: 'set' },
           { name: 'close', value: 'close' },
-       ))
+        ))
     .addStringOption(o =>
       o.setName('id')
-       .setDescription('ID de session (requis pour set/close)')
-       .setRequired(false)),
+        .setDescription('ID de session (requis pour set/close)')
+        .setRequired(false)),
 ];
 
 const handlers = {
   session: async (interaction) => {
     if (!global.PATHS) await installGlobalPaths();
-
     const action = interaction.options.getString('action');
     const id = interaction.options.getString('id')?.trim();
     const userId = interaction.user.id;
