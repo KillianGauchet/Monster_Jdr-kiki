@@ -1,14 +1,17 @@
 {
-  "name": "backend",
+  "name": "back",
   "version": "1.0.0",
   "main": "index.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1"
   },
-  "author": "kiki",
+  "keywords": [],
+  "author": "MadeByKiki",
   "license": "ISC",
   "description": "",
   "dependencies": {
-    "express": "^5.1.0"
+    "cors": "^2.8.5",
+    "express": "^5.1.0",
+    "oracledb": "^6.10.0"
   }
 }
